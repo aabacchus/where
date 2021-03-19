@@ -89,10 +89,25 @@ func parseLines(ips []byte) [][]string {
 			continue
 		}
 		if ip == '\n' {
-			words[line] = append(words[line], word)
-			words = append(words, []string{})
-			line++
-			word = ""
+			// remove duplicates by username
+			isDuplicate := false
+			// no need to check if we're on the first line
+			if line != 0 {
+				for _, prevline := range words[:line] {
+					if words[line][0] == prevline[0] {
+						isDuplicate = true
+					}
+				}
+			}
+			if isDuplicate {
+				words[line] = []string{}
+				word = ""
+			} else {
+				words[line] = append(words[line], word)
+				words = append(words, []string{})
+				line++
+				word = ""
+			}
 			continue
 		}
 		word = word + string(ip)
