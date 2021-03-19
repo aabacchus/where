@@ -25,8 +25,15 @@ import (
 	"strings"
 )
 
+func usage() {
+	fmt.Fprintf(os.Stderr, "usage: %s\t[-h] [-k]\n", os.Args[0])
+	flag.PrintDefaults()
+	fmt.Fprintf(os.Stderr, "\nwhere finds users who have opted in by creating a \".here\" file in their home directory,\nfinds their approximate location from their IP address, and creates a map of the locations of those users.\n")
+}
+
 func main() {
 	apiKey := flag.String("k", "", "API key for ipstack")
+	flag.Usage = usage
 	flag.Parse()
 
 	ips, err := getTestIps("whoips")
