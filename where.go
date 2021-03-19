@@ -17,12 +17,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 )
 
 func usage() {
@@ -42,31 +42,36 @@ func main() {
 		os.Exit(1)
 	}
 	lines := parseLines(ips)
-	var results = make([]person, len(lines))
-	for i, line := range lines {
+	responseChan := make(chan MarkResponse)
+	var results = make([]Marker, len(lines))
+	for _, line := range lines {
 		if len(line) > 5 {
-			// if there's something messy with mosh, ignore it (for now)
+			// if there's something messy eg. with mosh, ignore it (for now)
+			//line[4] = ""
+		}
+		go ipLatLng(*apiKey, line[0], line[4], responseChan)
+	}
+	var resp MarkResponse
+	for i := range lines {
+		resp = <-responseChan
+		if resp.Err != nil {
+			fmt.Printf("error getting ip location for %s: %s\n", resp.Mark.Name, resp.Err)
 			continue
 		}
-		resp, err := ipLatLng(*apiKey, line[4])
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		results[i] = person{
-			Uname: line[0],
-			Lat:   resp.Lat,
-			Lng:   resp.Lng,
-		}
-
+		fmt.Println(resp.Mark)
+		results[i] = resp.Mark
 	}
 	fmt.Println(results)
-
 }
 
-type person struct {
-	Uname    string
+type Marker struct {
+	Name     string
 	Lat, Lng float64
+}
+
+type MarkResponse struct {
+	Mark Marker
+	Err  error
 }
 
 func parseLines(ips []byte) [][]string {
@@ -96,30 +101,39 @@ func parseLines(ips []byte) [][]string {
 	return words
 }
 
-func ipLatLng(apikey string, ips ...string) (IPResponse, error) {
-	query := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s", strings.Join(ips, ","), apikey)
+func ipLatLng(apikey, name, ip string, ch chan MarkResponse) {
+	if ip == "" {
+		ch <- MarkResponse{Marker{Name: name}, errors.New("no IP provided")}
+		return
+	}
+	query := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s", ip, apikey)
 	resp, err := http.Get(query)
 	if err != nil {
-		return IPResponse{}, err
+		ch <- MarkResponse{Marker{Name: name}, err}
+		return
 	}
 	defer resp.Body.Close()
 	bytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return IPResponse{}, err
+		ch <- MarkResponse{Marker{Name: name}, err}
+		return
 	}
-	places := IPResponse{}
+	place := struct {
+		Lat float64 `json:"latitude"`
+		Lng float64 `json:"longitude"`
+	}{}
 
-	if err := json.Unmarshal(bytes, &places); err != nil {
-		return IPResponse{}, err
+	if err := json.Unmarshal(bytes, &place); err != nil {
+		ch <- MarkResponse{Marker{Name: name}, err}
+		return
 	}
-	return places, nil
-}
 
-// IPResponse is a simple struct wrapping relevant responses from the ipstack API
-type IPResponse struct {
-	ip  string  `json:"ip"`
-	Lat float64 `json:"latitude"`
-	Lng float64 `json:"longitude"`
+	ch <- MarkResponse{Marker{
+		Name: name,
+		Lat:  place.Lat,
+		Lng:  place.Lng,
+	}, nil}
+	return
 }
 
 func getTestIps(fname string) ([]byte, error) {
