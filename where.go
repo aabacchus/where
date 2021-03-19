@@ -61,7 +61,27 @@ func main() {
 		fmt.Println(resp.Mark)
 		results[i] = resp.Mark
 	}
-	fmt.Println(results)
+	//fmt.Println(results)
+	err = MarkersSaveJson(results, "ips.json")
+	if err != nil {
+		fmt.Printf("error saving as json: %s\n", err)
+		os.Exit(1)
+	}
+}
+
+func MarkersSaveJson(m []Marker, fname string) error {
+	f, err := os.OpenFile(fname, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	bytes, err := json.MarshalIndent(m, "", "\t")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(bytes)
+	return err
 }
 
 type Marker struct {
