@@ -1,1 +1,1 @@
-Inspired by (thebaer/tildes/where)[https://github.com/thebaer/tildes/tree/master/where]
+Inspired by [thebaer/tildes/where](https://github.com/thebaer/tildes/tree/master/where)
