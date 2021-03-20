@@ -26,13 +26,18 @@ import (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s\t[-h] [-k]\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s\t[-h] [-k]\n\t\t[-mboxu -mboxa -mboxs] [-mboxp]\n", os.Args[0])
 	flag.PrintDefaults()
 	fmt.Fprintf(os.Stderr, "\nwhere finds users who have opted in by creating a \".here\" file in their home directory,\nfinds their approximate location from their IP address, and creates a map of the locations of those users.\n")
 }
 
 func main() {
 	apiKey := flag.String("k", "", "API key for ipstack")
+	var mboxDetails MapboxDetails
+	flag.StringVar(&mboxDetails.Uname, "mboxu", "", "mapbox.com username")
+	flag.StringVar(&mboxDetails.Apikey, "mboxa", "", "mapbox.com API key")
+	flag.StringVar(&mboxDetails.Style, "mboxs", "", "mapbox map style")
+	flag.StringVar(&mboxDetails.Padding, "mboxp", "5", "mapbox map padding (a percentage without the %)")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -67,6 +72,15 @@ func main() {
 		fmt.Printf("error saving as json: %s\n", err)
 		os.Exit(1)
 	}
+
+	// make a map of the markers and save it as a png
+	imageFile := "map.png"
+	err = MapboxStatic(results, imageFile, mboxDetails)
+	if err != nil {
+		fmt.Printf("error creating static map: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("saved static map to %s\n", imageFile)
 }
 
 func MarkersSaveJson(m []Marker, fname string) error {
