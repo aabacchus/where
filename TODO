@@ -1,4 +1,3 @@
 * Only get locations of opted-in users
 * Anonymize users who wish
 * Create webpage (interactive map?)
-* Read input from json file and append new user information

@@ -43,7 +43,7 @@ func main() {
 
 	ips, err := getTestIps("whoips")
 	if err != nil {
-		fmt.Printf("error reading sample who --ips file: %s\n", err.Error)
+		fmt.Printf("error reading sample who --ips file: %s\n", err.Error())
 		os.Exit(1)
 	}
 	lines := parseLines(ips)
@@ -66,7 +66,40 @@ func main() {
 		fmt.Println(resp.Mark)
 		results[i] = resp.Mark
 	}
-	//fmt.Println(results)
+	// check if there's a file of results already
+	cacheFname := "ips.json"
+	if _, err := os.Stat(cacheFname); !os.IsNotExist(err) {
+		// file exists, so read from file
+		f, err := os.Open(cacheFname)
+		if err != nil {
+			fmt.Printf("error opening ips cache: %s\n", err)
+			os.Exit(1)
+		}
+		bytes, err := ioutil.ReadAll(f)
+		if err != nil {
+			fmt.Printf("error reading ips cache: %s\n", err)
+			os.Exit(1)
+		}
+		f.Close()
+		var cache []Marker
+		err = json.Unmarshal(bytes, &cache)
+		if err != nil {
+			fmt.Printf("error unmarshalling ips cache: %s\n", err)
+			os.Exit(1)
+		}
+		// if we have newer data for a user in results, use that
+		// so remove duplicates from the cache
+		for _, res := range results {
+			for i, c := range cache {
+				if res.Name == c.Name {
+					// remove the duplicate
+					cache = append(cache[:i], cache[i+1:]...)
+				}
+			}
+		}
+		// now add the results to the cache (newer results at the bottom)
+		results = append(cache, results...)
+	}
 	err = MarkersSaveJson(results, "ips.json")
 	if err != nil {
 		fmt.Printf("error saving as json: %s\n", err)
@@ -84,7 +117,7 @@ func main() {
 }
 
 func MarkersSaveJson(m []Marker, fname string) error {
-	f, err := os.OpenFile(fname, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+	f, err := os.Create(fname)
 	if err != nil {
 		return err
 	}
