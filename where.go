@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func usage() {
@@ -37,9 +38,18 @@ func main() {
 	flag.StringVar(&mboxDetails.Uname, "mboxu", "", "mapbox.com username")
 	flag.StringVar(&mboxDetails.Apikey, "mboxa", "", "mapbox.com API key")
 	flag.StringVar(&mboxDetails.Style, "mboxs", "", "mapbox map style")
-	flag.StringVar(&mboxDetails.Padding, "mboxp", "5", "mapbox map padding (a percentage without the %)")
+	flag.IntVar(&mboxDetails.Padding, "mboxp", 5, "mapbox map padding (a percentage without the %)")
 	flag.Usage = usage
 	flag.Parse()
+
+	/*
+			ips, err := exec.Command("who", "--ips").Output()
+			if err != nil {
+				log.Println(err)
+			}
+		fmt.Println(ips)
+		os.Exit(0)
+	*/
 
 	ips, err := getTestIps("whoips")
 	if err != nil {
@@ -50,11 +60,22 @@ func main() {
 	responseChan := make(chan MarkResponse)
 	var results = make([]Marker, len(lines))
 	for _, line := range lines {
-		if len(line) > 5 {
-			// if there's something messy eg. with mosh, ignore it (for now)
-			//line[4] = ""
+		ip := line[4]
+		if ip[0] == '(' {
+			if strings.Contains(ip, "mosh") {
+				ip = "0"
+			} else {
+				endidx := strings.Index(ip, ":")
+				if endidx == -1 {
+					endidx = strings.Index(ip, ")")
+					if endidx == -1 {
+						endidx = len(ip)
+					}
+				}
+				ip = ip[1:endidx]
+			}
 		}
-		go ipLatLng(*apiKey, line[0], line[4], responseChan)
+		go ipLatLng(*apiKey, line[0], ip, responseChan)
 	}
 	var resp MarkResponse
 	for i := range lines {

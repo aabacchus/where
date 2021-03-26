@@ -1,3 +1,4 @@
+* Don't replace cache with 0,0 coords
 * Only get locations of opted-in users
 * Anonymize users who wish
 * Create webpage (interactive map?)

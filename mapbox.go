@@ -17,7 +17,7 @@ type MapboxDetails struct {
 	Uname   string
 	Style   string
 	Apikey  string
-	Padding string
+	Padding int
 }
 
 // MapboxStatic creates a static image of a map
@@ -31,11 +31,19 @@ func MapboxStatic(m []Marker, fname string, mbox MapboxDetails) error {
 	// the field after auto is the dimensions of the png image
 	// the parameters at the end (after the ?) are the access_token (required)
 	// and padding (optional)
-	suffix := fmt.Sprintf("/auto/800x720?padding=%s&access_token=%s", mbox.Padding, mbox.Apikey)
+	suffix := fmt.Sprintf("/auto/800x720?padding=%d&access_token=%s", mbox.Padding, mbox.Apikey)
 
 	var markersMapbox string
 	for _, mark := range m {
+		// don't plot places with no data
+		if mark.Lat == 0 && mark.Lng == 0 {
+			continue
+		}
 		markersMapbox += MarkerToMapbox(mark, "", "aa0500") + ","
+	}
+	// if there were none left after removing those at (0,0), return
+	if len(markersMapbox) == 0 {
+		return fmt.Errorf("no markers with non-zero location")
 	}
 	// remove the final comma
 	markersMapbox = markersMapbox[:len(markersMapbox)-1]
