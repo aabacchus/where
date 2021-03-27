@@ -108,18 +108,30 @@ func main() {
 			fmt.Printf("error unmarshalling ips cache: %s\n", err)
 			os.Exit(1)
 		}
-		// if we have newer data for a user in results, use that
-		// so remove duplicates from the cache
-		for _, res := range results {
-			for i, c := range cache {
-				if res.Name == c.Name {
-					// remove the duplicate
-					cache = append(cache[:i], cache[i+1:]...)
+		// make some temporary maps in order to merge the two slices
+		tmpCache := MarkersMakeMap(cache)
+		tmpResults := MarkersMakeMap(results)
+		var out []Marker
+		// remove duplicates, using the one which isn't 0,0
+		for k, val := range tmpResults {
+			if cachedVal, ok := tmpCache[k]; ok {
+				if val.Lat == 0 && val.Lng == 0 {
+					out = append(out, cachedVal)
+				} else {
+					out = append(out, val)
 				}
+			} else {
+				out = append(out, val)
 			}
 		}
-		// now add the results to the cache (newer results at the bottom)
-		results = append(cache, results...)
+		// add the cached values which aren't in the new lot
+		for k, cVal := range tmpCache {
+			if _, ok := tmpResults[k]; !ok {
+				out = append(out, cVal)
+			}
+		}
+		results = out
+		fmt.Println(results)
 	}
 	err = MarkersSaveJson(results, "ips.json")
 	if err != nil {
@@ -135,6 +147,14 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("saved static map to %s\n", imageFile)
+}
+
+func MarkersMakeMap(m []Marker) map[string]Marker {
+	r := make(map[string]Marker)
+	for _, k := range m {
+		r[k.Name] = k
+	}
+	return r
 }
 
 func MarkersSaveJson(m []Marker, fname string) error {
