@@ -21,8 +21,10 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -34,6 +36,7 @@ func usage() {
 
 func main() {
 	apiKey := flag.String("k", "", "API key for ipstack")
+	usePretendWhoips := flag.Bool("p", false, "use a cached output of who --ips")
 	var mboxDetails MapboxDetails
 	flag.StringVar(&mboxDetails.Uname, "mboxu", "", "mapbox.com username")
 	flag.StringVar(&mboxDetails.Apikey, "mboxa", "", "mapbox.com API key")
@@ -42,20 +45,21 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	/*
-			ips, err := exec.Command("who", "--ips").Output()
-			if err != nil {
-				log.Println(err)
-			}
-		fmt.Println(ips)
-		os.Exit(0)
-	*/
-
-	ips, err := getTestIps("whoips")
-	if err != nil {
-		fmt.Printf("error reading sample who --ips file: %s\n", err.Error())
-		os.Exit(1)
+	var ips []byte
+	var err error
+	if *usePretendWhoips {
+		ips, err = getTestIps("whoips")
+		if err != nil {
+			fmt.Printf("error reading sample who --ips file: %s\n", err.Error())
+			os.Exit(1)
+		}
+	} else {
+		ips, err = exec.Command("who", "--ips").Output()
+		if err != nil {
+			log.Println(err)
+		}
 	}
+
 	lines := parseLines(ips)
 	responseChan := make(chan MarkResponse)
 	var results = make([]Marker, len(lines))
@@ -113,6 +117,7 @@ func main() {
 		tmpResults := MarkersMakeMap(results)
 		var out []Marker
 		// remove duplicates, using the one which isn't 0,0
+		// append the good Marker to out
 		for k, val := range tmpResults {
 			if cachedVal, ok := tmpCache[k]; ok {
 				if val.Lat == 0 && val.Lng == 0 {
@@ -121,6 +126,7 @@ func main() {
 					out = append(out, val)
 				}
 			} else {
+				// not a duplicate
 				out = append(out, val)
 			}
 		}
