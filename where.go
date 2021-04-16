@@ -29,7 +29,7 @@ import (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s\t[-h] [-k]\n\t\t[-mboxu -mboxa -mboxs] [-mboxp]\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s\t[-h] [-p] [-k]\n\t\t[-c | -mboxu -mboxa -mboxs [-mboxp]]\n", os.Args[0])
 	flag.PrintDefaults()
 	fmt.Fprintf(os.Stderr, "\nwhere finds users who have opted in by creating a \".here\" file in their home directory,\nfinds their approximate location from their IP address, and creates a map of the locations of those users.\n")
 }
@@ -37,6 +37,7 @@ func usage() {
 func main() {
 	apiKey := flag.String("k", "", "API key for ipstack")
 	usePretendWhoips := flag.Bool("p", false, "use a cached output of who --ips")
+	useCredFile := flag.String("c", "", "read credentials from a json file (keys are command-line flags)")
 	var mboxDetails MapboxDetails
 	flag.StringVar(&mboxDetails.Uname, "mboxu", "", "mapbox.com username")
 	flag.StringVar(&mboxDetails.Apikey, "mboxa", "", "mapbox.com API key")
@@ -58,6 +59,37 @@ func main() {
 		ips, err = exec.Command("who", "--ips").Output()
 		if err != nil {
 			log.Println(err)
+		}
+	}
+
+	// if necessary, get the credentials from a file
+	// (overrides credentials specified with flags)
+	if *useCredFile != "" {
+		bytes, err := read(*useCredFile)
+		if err != nil {
+			fmt.Printf("error reading cred file: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("%s\n", bytes)
+		var creds struct {
+			K     string
+			Mboxa string
+			Mboxp int
+			Mboxs string
+			Mboxu string
+		}
+		err = json.Unmarshal(bytes, &creds)
+		if err != nil {
+			fmt.Printf("error unmarshalling creds: %s\n", err)
+			os.Exit(1)
+		}
+		// set global variables to our credentials
+		*apiKey = creds.K
+		mboxDetails = MapboxDetails{
+			Apikey:  creds.Mboxa,
+			Padding: creds.Mboxp,
+			Style:   creds.Mboxs,
+			Uname:   creds.Mboxu,
 		}
 	}
 
