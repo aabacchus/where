@@ -49,7 +49,7 @@ func main() {
 	var ips []byte
 	var err error
 	if *usePretendWhoips {
-		ips, err = getTestIps("whoips")
+		ips, err = read("whoips")
 		if err != nil {
 			fmt.Printf("error reading sample who --ips file: %s\n", err.Error())
 			os.Exit(1)
@@ -97,17 +97,11 @@ func main() {
 	cacheFname := "ips.json"
 	if _, err := os.Stat(cacheFname); !os.IsNotExist(err) {
 		// file exists, so read from file
-		f, err := os.Open(cacheFname)
-		if err != nil {
-			fmt.Printf("error opening ips cache: %s\n", err)
-			os.Exit(1)
-		}
-		bytes, err := ioutil.ReadAll(f)
+		bytes, err := read(cacheFname)
 		if err != nil {
 			fmt.Printf("error reading ips cache: %s\n", err)
 			os.Exit(1)
 		}
-		f.Close()
 		var cache []Marker
 		err = json.Unmarshal(bytes, &cache)
 		if err != nil {
@@ -279,8 +273,8 @@ func ipLatLng(apikey, name, ip string, ch chan MarkResponse) {
 	return
 }
 
-// getTestIps is just a wrapper to read a file.
-func getTestIps(fname string) ([]byte, error) {
+// read is just a wrapper to read a file.
+func read(fname string) ([]byte, error) {
 	f, err := os.Open(fname)
 	defer f.Close()
 	if err != nil {
