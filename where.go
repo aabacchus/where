@@ -45,6 +45,7 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	// get the who data, either from a file or the command itself
 	var ips []byte
 	var err error
 	if *usePretendWhoips {
@@ -60,6 +61,7 @@ func main() {
 		}
 	}
 
+	// extract data from the who output
 	lines := parseLines(ips)
 	responseChan := make(chan MarkResponse)
 	var results = make([]Marker, len(lines))
@@ -139,6 +141,7 @@ func main() {
 		results = out
 		fmt.Println(results)
 	}
+	// save our results to a json file
 	err = MarkersSaveJson(results, "ips.json")
 	if err != nil {
 		fmt.Printf("error saving as json: %s\n", err)
@@ -163,6 +166,7 @@ func MarkersMakeMap(m []Marker) map[string]Marker {
 	return r
 }
 
+// MarkersSaveJson saves a slice of Markers to fname in json format.
 func MarkersSaveJson(m []Marker, fname string) error {
 	f, err := os.Create(fname)
 	if err != nil {
@@ -178,16 +182,24 @@ func MarkersSaveJson(m []Marker, fname string) error {
 	return err
 }
 
+// Marker holds the data for a named location.
 type Marker struct {
 	Name     string
 	Lat, Lng float64
 }
 
+// MarkResponse is used as a channel to get the results from ipLatLng.
+// Making a struct and sending the results on a channel isn't a great method
+// (I intend to make this better)
 type MarkResponse struct {
 	Mark Marker
 	Err  error
 }
 
+// parseLines converts a slice of bytes into a slice of slices of strings,
+// where the bytes are separated by whitespace and newlines.
+// Lines in the input with the same first field are considered
+// duplicates, and only one version is kept.
 func parseLines(ips []byte) [][]string {
 	var word string
 	var words [][]string
@@ -230,6 +242,8 @@ func parseLines(ips []byte) [][]string {
 	return words
 }
 
+// ipLatLng uses the IPStack api to convert an IP address into
+// a latitude and longitude, sending the result on the channel
 func ipLatLng(apikey, name, ip string, ch chan MarkResponse) {
 	if ip == "" {
 		ch <- MarkResponse{Marker{Name: name}, errors.New("no IP provided")}
@@ -265,6 +279,7 @@ func ipLatLng(apikey, name, ip string, ch chan MarkResponse) {
 	return
 }
 
+// getTestIps is just a wrapper to read a file.
 func getTestIps(fname string) ([]byte, error) {
 	f, err := os.Open(fname)
 	defer f.Close()
