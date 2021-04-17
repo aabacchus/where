@@ -21,22 +21,23 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 )
 
+var verbose *bool
+
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s\t[-h] [-p] [-k]\n\t\t[-c | -mboxu -mboxa -mboxs [-mboxp]]\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s\t[-h] [-p] [-v]\n\t\t[-c | -k -mboxu -mboxa -mboxs [-mboxp]]\n", os.Args[0])
 	flag.PrintDefaults()
 	fmt.Fprintf(os.Stderr, "\nwhere finds users who have opted in by creating a \".here\" file in their home directory,\nfinds their approximate location from their IP address, and creates a map of the locations of those users.\n")
 }
 
 // exists returns true if fname is a file that exists.
 func exists(fname string) bool {
-	_, err := os.Stat(fname);
+	_, err := os.Stat(fname)
 	return !os.IsNotExist(err)
 }
 
@@ -45,13 +46,20 @@ func exists(fname string) bool {
 // (all data is anonymous so both are used in the same way)
 func isOptedIn(user string) bool {
 	homedir := fmt.Sprintf("/home/%s/", user)
-	return exists(homedir + ".here") || exists(homedir + ".somewhere")
+	return exists(homedir+".here") || exists(homedir+".somewhere")
+}
+
+func log(msg ...interface{}) {
+	if *verbose {
+		fmt.Println(msg)
+	}
 }
 
 func main() {
 	apiKey := flag.String("k", "", "API key for ipstack")
 	usePretendWhoips := flag.Bool("p", false, "use a cached output of who --ips")
 	useCredFile := flag.String("c", "", "read credentials from a json file (keys are command-line flags)")
+	verbose = flag.Bool("v", false, "turn on verbose output")
 	var mboxDetails MapboxDetails
 	flag.StringVar(&mboxDetails.Uname, "mboxu", "", "mapbox.com username")
 	flag.StringVar(&mboxDetails.Apikey, "mboxa", "", "mapbox.com API key")
@@ -72,7 +80,7 @@ func main() {
 	} else {
 		ips, err = exec.Command("who", "--ips").Output()
 		if err != nil {
-			log.Println(err)
+			fmt.Println("error running `who --ips`: " + err.Error())
 		}
 	}
 
@@ -84,7 +92,6 @@ func main() {
 			fmt.Printf("error reading cred file: %s\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("%s\n", bytes)
 		var creds struct {
 			K     string
 			Mboxa string
@@ -147,7 +154,7 @@ func main() {
 			fmt.Printf("error getting ip location for %s: %s\n", resp.Mark.Name, resp.Err)
 			continue
 		}
-		fmt.Println(resp.Mark)
+		log(resp.Mark)
 		results[i] = resp.Mark
 	}
 	// check if there's a file of results already
@@ -191,7 +198,7 @@ func main() {
 			}
 		}
 		results = out
-		fmt.Println(results)
+		log(results)
 	}
 	// save our results to a json file
 	err = MarkersSaveJson(results, "ips.json")
