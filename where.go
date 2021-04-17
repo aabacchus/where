@@ -34,6 +34,20 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "\nwhere finds users who have opted in by creating a \".here\" file in their home directory,\nfinds their approximate location from their IP address, and creates a map of the locations of those users.\n")
 }
 
+// exists returns true if fname is a file that exists.
+func exists(fname string) bool {
+	_, err := os.Stat(fname);
+	return !os.IsNotExist(err)
+}
+
+// isOptedIn checks if the user has opted in by having a file
+// named ".here" or ".somewhere" in their home directory.
+// (all data is anonymous so both are used in the same way)
+func isOptedIn(user string) bool {
+	homedir := fmt.Sprintf("/home/%s/", user)
+	return exists(homedir + ".here") || exists(homedir + ".somewhere")
+}
+
 func main() {
 	apiKey := flag.String("k", "", "API key for ipstack")
 	usePretendWhoips := flag.Bool("p", false, "use a cached output of who --ips")
@@ -94,7 +108,17 @@ func main() {
 	}
 
 	// extract data from the who output
-	lines := parseLines(ips)
+	rawlines := parseLines(ips)
+	lines := make([][]string, 0)
+
+	// only keep users who have opted in
+	for _, line := range rawlines {
+		name := line[0]
+		if isOptedIn(name) {
+			lines = append(lines, line)
+		}
+	}
+
 	responseChan := make(chan MarkResponse)
 	var results = make([]Marker, len(lines))
 	for _, line := range lines {
@@ -115,6 +139,7 @@ func main() {
 		}
 		go ipLatLng(*apiKey, line[0], ip, responseChan)
 	}
+
 	var resp MarkResponse
 	for i := range lines {
 		resp = <-responseChan
@@ -127,8 +152,7 @@ func main() {
 	}
 	// check if there's a file of results already
 	cacheFname := "ips.json"
-	if _, err := os.Stat(cacheFname); !os.IsNotExist(err) {
-		// file exists, so read from file
+	if exists(cacheFname) {
 		bytes, err := read(cacheFname)
 		if err != nil {
 			fmt.Printf("error reading ips cache: %s\n", err)
@@ -146,8 +170,9 @@ func main() {
 		var out []Marker
 		// remove duplicates, using the one which isn't 0,0
 		// append the good Marker to out
+		// also check that the user is still opted in
 		for k, val := range tmpResults {
-			if cachedVal, ok := tmpCache[k]; ok {
+			if cachedVal, ok := tmpCache[k]; ok && isOptedIn(k) {
 				if val.Lat == 0 && val.Lng == 0 {
 					out = append(out, cachedVal)
 				} else {
@@ -159,8 +184,9 @@ func main() {
 			}
 		}
 		// add the cached values which aren't in the new lot
+		// also check that the user is still opted in
 		for k, cVal := range tmpCache {
-			if _, ok := tmpResults[k]; !ok {
+			if _, ok := tmpResults[k]; !ok && isOptedIn(k) {
 				out = append(out, cVal)
 			}
 		}
