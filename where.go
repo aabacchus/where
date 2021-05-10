@@ -51,7 +51,7 @@ func isOptedIn(user string) bool {
 
 func log(msg ...interface{}) {
 	if *verbose {
-		fmt.Println(msg)
+		fmt.Println(msg...)
 	}
 }
 
@@ -116,6 +116,7 @@ func main() {
 
 	// extract data from the who output
 	rawlines := parseLines(ips)
+	log("raw who data: ", rawlines)
 	lines := make([][]string, 0)
 
 	// only keep users who have opted in
@@ -131,8 +132,8 @@ func main() {
 	for _, line := range lines {
 		ip := line[4]
 		if ip[0] == '(' {
-			if strings.Contains(ip, "mosh") {
-				ip = "0"
+			if strings.Contains(ip, "mosh") || strings.Contains(ip, "tmux") {
+				ip = ""
 			} else {
 				endidx := strings.Index(ip, ":")
 				if endidx == -1 {
@@ -154,7 +155,7 @@ func main() {
 			fmt.Printf("error getting ip location for %s: %s\n", resp.Mark.Name, resp.Err)
 			continue
 		}
-		log(resp.Mark)
+		log("found location: ", resp.Mark)
 		results[i] = resp.Mark
 	}
 	// check if there's a file of results already
