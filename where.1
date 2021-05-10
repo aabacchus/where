@@ -1,0 +1,36 @@
+.Dd $Mdocdate$
+.Dt WHERE 1
+.\".Os
+.Sh NAME
+.Nm where
+.Nd plot a map of users on your system
+.Sh SYNOPSIS
+.Nm
+.Op Fl hpv
+.Fl c Ar file
+.Nm
+.Op Fl hpv
+.Fl k Ar ipstack_api
+.Fl mboxu Ar uname
+.Fl mboxa Ar api
+.Fl mboxs Ar style
+.Op Fl mboxp Ar padding%
+.Sh DESCRIPTION
+Standard options:
+.Bl -tag -width Ds
+.It Fl p
+use a cached output of `who --ips`, read from the file 
+.Ar whoips
+.It Fl v
+turn on verbose output
+.It Fl c Ar file
+read credentials from a json file (keys are command-line flags)
+.It Fl h
+print usage
+.El
+.Sh FILES
+.Ar whoips
+.Ar ips.json
+.Ar map.png
+.Sh AUTHOR
+.An Lk https://github.com/aabacchus aabacchus
