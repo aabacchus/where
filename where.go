@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"strconv"
 )
 
 var verbose *bool
@@ -309,7 +310,9 @@ func ipLatLng(apikey, name, ip string, ch chan MarkResponse) {
 		ch <- MarkResponse{Marker{Name: name}, errors.New("no IP provided")}
 		return
 	}
-	query := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s", ip, apikey)
+	// moving to a libre IP service, so apikey is no longer required
+	_ = apikey
+	query := fmt.Sprintf("http://api.ipgeolocationapi.com/geolocate/%s", ip)
 	resp, err := http.Get(query)
 	if err != nil {
 		ch <- MarkResponse{Marker{Name: name}, err}
@@ -322,19 +325,27 @@ func ipLatLng(apikey, name, ip string, ch chan MarkResponse) {
 		return
 	}
 	place := struct {
-		Lat float64 `json:"latitude"`
-		Lng float64 `json:"longitude"`
+		Geo struct {
+			Lat string `json:"latitude_dec"`
+			Lng string `json:"longitude_dec"`
+		} `json:"geo"`
 	}{}
+	log("response: ", fmt.Sprintf("%s", bytes))
 
 	if err := json.Unmarshal(bytes, &place); err != nil {
 		ch <- MarkResponse{Marker{Name: name}, err}
 		return
 	}
 
+	lat, err := strconv.ParseFloat(place.Geo.Lat, 64)
+	if err != nil { fmt.Fprintf(os.Stderr, "error parsing float from %q: %s\n", place.Geo.Lat, err.Error) }
+	lng, err := strconv.ParseFloat(place.Geo.Lng, 64)
+	if err != nil { fmt.Fprintf(os.Stderr, "error parsing float from %q: %s\n", place.Geo.Lat, err.Error) }
+
 	ch <- MarkResponse{Marker{
 		Name: name,
-		Lat:  place.Lat,
-		Lng:  place.Lng,
+		Lat:  lat,
+		Lng:  lng,
 	}, nil}
 	return
 }
