@@ -166,6 +166,7 @@ func main() {
 			fmt.Printf("error reading ips cache: %s\n", err)
 			os.Exit(1)
 		}
+		log(fmt.Sprintf("found previous results file %s", cacheFname))
 		var cache []Marker
 		err = json.Unmarshal(bytes, &cache)
 		if err != nil {
@@ -309,13 +310,20 @@ func ipLatLng(apikey, name, ip string, ch chan MarkResponse) {
 		ch <- MarkResponse{Marker{Name: name}, errors.New("no IP provided")}
 		return
 	}
-	query := fmt.Sprintf("http://api.ipstack.com/%s?access_key=%s", ip, apikey)
+	query := fmt.Sprintf("https://freegeoip.app/json/%s", ip)
 	resp, err := http.Get(query)
 	if err != nil {
 		ch <- MarkResponse{Marker{Name: name}, err}
 		return
 	}
 	defer resp.Body.Close()
+	// freegeoip.app will give 403 if we've made more than 15,000 queries per hour.
+	// Unlikely, yes, but good to be careful.
+	if resp.StatusCode == 403 {
+		// this is logged to stderr, so it should be picked up by the cron daemon
+		fmt.Fprintf(os.Stderr, "The request to freegeoip.app returned %s", resp.Status)
+	}
+
 	bytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		ch <- MarkResponse{Marker{Name: name}, err}
