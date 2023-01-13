@@ -209,6 +209,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	err = LeafletDynamic(results, "dynamic.html")
+	if err != nil {
+		fmt.Printf("error making leaflet dynamic map: %s\n", err)
+		os.Exit(1)
+	}
+
 	// make a map of the markers and save it as a png
 	imageFile := "map.png"
 	err = MapboxStatic(results, imageFile, mboxDetails)
@@ -217,6 +223,54 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("saved static map to %s\n", imageFile)
+}
+
+func LeafletDynamic(m []Marker, fname string) error {
+	f, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	fmt.Fprintf(f, `<!DOCTYPE html>
+<html>
+<!-- copyright 2023 ~phoebos <phoebos@ctrl-c.club> -->
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dynamic map of ctrl-c club users</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+     integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+     crossorigin=""></script>
+</head>
+<body>
+<h1>Map of Ctrl-C.Club users (dynamic version)</h1>
+<p>To opt-in, add a file named <code style="font-family: monospace">.here</code> to your home directory.
+The map is updated every 15 minutes.</p>
+<p>To view a map without Javascript, see <a href="map.html">here</a>.</p>
+<div id="map" style="height: 500px;"></div>
+<p><a href="https://github.com/aabacchus/where">Repo</a></p>
+<p><a href="/~bear/where.html">Inspiration</a></p>
+<script>
+    var map = L.map('map').setView([20,10], 1);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxzoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);`)
+
+	for _, k := range m {
+		if k.Lat == 0 && k.Lng == 0 {
+			continue
+		}
+		_, err = fmt.Fprintf(f, "L.marker([%f,%f]).addTo(map);\n", k.Lat, k.Lng)
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(f, `</script></body></html>`)
+	return err
 }
 
 func MarkersMakeMap(m []Marker) map[string]Marker {
