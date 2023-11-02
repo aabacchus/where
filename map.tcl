@@ -56,21 +56,23 @@ proc lookup_ip {key ip} {
 
 proc init_db {} {
 	sqlite3 db ips.sqlite
+	db timeout 2000
 	db eval {CREATE TABLE IF NOT EXISTS ips(ip TEXT PRIMARY KEY, lat, long TEXT);}
+	db eval {CREATE TABLE IF NOT EXISTS names(name TEXT PRIMARY KEY, ip TEXT);}
 	return db
 }
 
-proc check_cache {db ip} {
+proc check_ip_cache {db ip} {
 	set ll [db eval {SELECT lat,long FROM ips WHERE ip=$ip}]
 	return $ll
 }
 
-proc update_cache {db ip lat long} {
+proc update_ip_cache {db ip lat long} {
 	db eval {INSERT INTO ips VALUES($ip, $lat, $long)}
 }
 
-proc ip_to_ll {db ipkey ip} {
-	set cached [check_cache $db $ip]
+proc store_ip_to_ll {db ipkey ip} {
+	set cached [check_ip_cache $db $ip]
 	if {$cached ne {}} {
 		return $cached
 	} else {
@@ -78,8 +80,25 @@ proc ip_to_ll {db ipkey ip} {
 		if {$ll eq {}} {
 			return
 		}
-		update_cache $db $ip {*}$ll
+		update_ip_cache $db $ip {*}$ll
 		return $ll
+	}
+}
+
+proc get_lls {db} {
+	set lls {}
+	$db eval {SELECT DISTINCT lat,long FROM ips JOIN names USING(ip)} {
+		lappend lls [list $lat $long]
+	}
+	return $lls
+}
+
+proc store_name {db name ip} {
+	# maintain a table of most recent ips for each user. plot these, using the ips table as a cache.
+	if {[$db exists {SELECT 1 FROM names WHERE name=$name}]} {
+		$db eval {UPDATE names SET ip=$ip WHERE name=$name}
+	} else {
+		$db eval {INSERT INTO names VALUES($name,$ip)}
 	}
 }
 
@@ -121,6 +140,7 @@ proc parse_who {txt} {
 
 	# check the duplicates and pick the first which is an ip.
 	# save them to a new dict so that keys without any valid ips are removed.
+	set new {}
 	dict for {key vals} $parsed {
 		foreach v $vals {
 			if {[regexp {^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$} $v]} {
@@ -129,8 +149,9 @@ proc parse_who {txt} {
 			}
 		}
 	}
+	set parsed $new
 
-	set parsed [dict filter $new script {name ip} {filter_opted_in $name $ip}]
+	set parsed [dict filter $parsed script {name ip} {filter_opted_in $name $ip}]
 
 	return $parsed
 }
@@ -173,7 +194,6 @@ proc static_map {lls fname creds} {
 	}
 
 	set req "${url}[join $markers ,]${suffix}"
-	puts "REQ: $req"
 	lassign [httpget $req] res err
 	if {$err ne {}} {
 		puts "ERROR: $err"
@@ -196,11 +216,13 @@ proc main {} {
 
 	set db [init_db]
 
-	set lls {}
+	# update the databases
 	dict for {name ip} $parsed {
-		lappend lls [ip_to_ll $db $ipkey $ip]
+		store_ip_to_ll $db $ipkey $ip
+		store_name $db $name $ip
 	}
-	puts [join $lls "\n"]
+	# query the databases to get lls to plot
+	set lls [get_lls $db]
 
 	# done with this now
 	$db close
@@ -209,4 +231,5 @@ proc main {} {
 	static_map $lls "map.png" $creds
 }
 
+# TODO: get arg of a DESTDIR and write map.html and dynamic.html there rather than relying on a shell script.
 main
