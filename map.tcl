@@ -157,7 +157,8 @@ proc parse_who {txt} {
 }
 
 proc filter_opted_in {name ip} {
-	return [file exists [file join /home $name .here]]
+	return [expr {[file exists [file join /home $name .here]] ||
+		[file exists [file join /home $name .somewhere]]}]
 }
 
 proc dynamic_map {lls fname} {
