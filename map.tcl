@@ -87,7 +87,7 @@ proc store_ip_to_ll {db ipkey ip} {
 
 proc get_lls {db} {
 	set lls {}
-	$db eval {SELECT DISTINCT lat,long FROM ips JOIN names USING(ip)} {
+	$db eval {SELECT DISTINCT lat,long FROM ips,names WHERE ips.ip = names.ip} {
 		lappend lls [list $lat $long]
 	}
 	return $lls
@@ -210,10 +210,7 @@ proc static_map {lls fname creds} {
 proc main {} {
 	lassign [parse_creds creds.json] ipkey creds
 
-	set f [open whoips r]
-	set txt [read $f]
-	close $f
-	set parsed [parse_who $txt]
+	set parsed [parse_who [get_who]]
 
 	set db [init_db]
 
